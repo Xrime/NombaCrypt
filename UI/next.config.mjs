@@ -1,12 +1,5 @@
-import type { NextConfig } from 'next';
-
-/**
- * Next.js configuration for NombaCrypt Shell UI.
- *
- * - reactStrictMode enabled for development safety
- * - API rewrites proxy /api/* to the Python backend
- */
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   /** Allow images from the backend origin */
   images: {
