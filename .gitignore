@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+# NombaCrypt Shell — Git Ignore
+# ═══════════════════════════════════════════════════════════════
+
+# ── Environment & Secrets ──
+.env
+*.pem
+*.key
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── C++ Build Artifacts ──
+backend-engine/cmake-build-*/
+backend-engine/build/
+backend-engine/*.o
+backend-engine/*.so
+backend-engine/*.a
+backend-engine/*.dylib
+backend-engine/*.exe
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# ── Python ──
+control-api/__pycache__/
+control-api/**/__pycache__/
+control-api/*.pyc
+control-api/.pytest_cache/
+control-api/venv/
+control-api/env/
+control-api/*.egg-info/
+control-api/instance/
+control-api/*.db
+
+# ── Node.js / Next.js ──
+UI/node_modules/
+UI/.next/
+UI/out/
+UI/.env.local
+
+# ── Simulator ──
+simulator/__pycache__/
+simulator/**/__pycache__/
+simulator/venv/
+
+# ── OS Files ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ──
+*.log
+logs/

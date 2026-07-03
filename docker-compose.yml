@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════════════════
+# NombaCrypt Shell — Docker Compose (Full Stack)
+# ═══════════════════════════════════════════════════════════════
+# Usage: docker-compose up --build
+# This starts all 3 layers simultaneously.
+
+version: '3.9'
+
+services:
+  # ── Layer 1: C++ Data Plane Engine ──
+  engine:
+    build:
+      context: ./backend-engine
+      dockerfile: Dockerfile
+    container_name: nombacrypt-engine
+    ports:
+      - "${ENGINE_HTTP_PORT:-8080}:8080"   # HTTP API
+      - "${ENGINE_WS_PORT:-8081}:8081"     # WebSocket Telemetry
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - nombacrypt-net
+
+  # ── Layer 2: Python Control API ──
+  api:
+    build:
+      context: ./control-api
+      dockerfile: Dockerfile
+    container_name: nombacrypt-api
+    ports:
+      - "${CONTROL_API_PORT:-5000}:5000"
+    env_file:
+      - .env
+    depends_on:
+      - engine
+    restart: unless-stopped
+    networks:
+      - nombacrypt-net
+
+  # ── Layer 3: React/Next.js Dashboard ──
+  dashboard:
+    build:
+      context: ./UI
+      dockerfile: Dockerfile
+    container_name: nombacrypt-dashboard
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - nombacrypt-net
+
+networks:
+  nombacrypt-net:
+    driver: bridge
