@@ -1,68 +1,40 @@
 #pragma once
 
 /**
- * @file config.hpp
- * @brief Runtime configuration for the NombaCrypt Shell backend engine.
- *
- * Reads all tunables from environment variables so that the engine can be
- * configured without recompilation (12-factor style).
+  Environment configuration loader for NombaCrypt Shell.
  */
 
-#include <cstdint>
 #include <string>
+#include <cstdint>
 
 namespace nombacrypt {
+    class Config {
+    public:
+        static Config& get_instance();
+        void load_from_env();
+        std::string nomba_client_id;
+        std::string nomba_private_key;
+        std::string nomba_account_id;
+        std::string nomba_api_base_url;
+        std::string channel_b_client_id;
+        std::string channel_b_private_key;
+        std::string channel_c_client_id;
+        std::string channel_c_private_key;
+        uint16_t http_port;
+        uint16_t ws_port;
+        size_t   buffer_capacity;
+        size_t   ingest_threads;
+        size_t   crypto_threads;
+        size_t   dispatch_threads;
+        Config(const Config&) = delete;
+        Config& operator=(const Config&) = delete;
+        Config(Config&&) = delete;
+        Config& operator=(Config&&) = delete;
 
-/**
- * @class Config
- * @brief Singleton-style configuration holder.
- *
- * Populate by calling @ref load_from_env() once at startup.
- */
-class Config {
-public:
-    Config() = default;
-    ~Config() = default;
-
-    // ── Loaders ──────────────────────────────────────────────────────
-    /**
-     * @brief Populate all fields from environment variables.
-     * @return true if all mandatory variables were found.
-     *
-     * Expected env vars:
-     *   NOMBA_CLIENT_ID, NOMBA_PRIVATE_KEY,
-     *   ENGINE_PORT, WS_PORT, WORKER_COUNT,
-     *   LOG_LEVEL, MULTI_API_ENABLED
-     */
-    bool load_from_env();
-
-    /**
-     * @brief Load configuration from a JSON file path.
-     * @param filepath Absolute or relative path to a JSON config file.
-     * @return true on success.
-     */
-    bool load_from_file(const std::string& filepath);
-
-    // ── Accessors ────────────────────────────────────────────────────
-    [[nodiscard]] const std::string& nomba_client_id()  const noexcept;
-    [[nodiscard]] const std::string& nomba_private_key() const noexcept;
-    [[nodiscard]] uint16_t           engine_port()       const noexcept;
-    [[nodiscard]] uint16_t           ws_port()           const noexcept;
-    [[nodiscard]] uint32_t           worker_count()      const noexcept;
-    [[nodiscard]] const std::string& log_level()         const noexcept;
-    [[nodiscard]] bool               multi_api_enabled() const noexcept;
-
-private:
-    std::string nomba_client_id_;
-    std::string nomba_private_key_;
-    uint16_t    engine_port_       = 9100;
-    uint16_t    ws_port_           = 9101;
-    uint32_t    worker_count_      = 4;
-    std::string log_level_         = "INFO";
-    bool        multi_api_enabled_ = false;
-
-    /// Helper: read an env var or return a default.
-    static std::string env_or(const char* name, const char* fallback);
-};
+    private:
+        Config();
+        std::string get_env(const char* key, const std::string& default_value = "");
+        int get_env_int(const char* key, int default_value);
+    };
 
 } // namespace nombacrypt

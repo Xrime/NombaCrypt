@@ -1,86 +1,45 @@
 #pragma once
 
-/**
- * @file logger.hpp
- * @brief Thread-safe logging facility for the NombaCrypt Shell backend engine.
- *
- * Provides LOG_INFO, LOG_WARN, LOG_ERROR convenience macros that capture
- * file/line information and delegate to Logger::log().
- */
-
-#include <cstdint>
-#include <mutex>
 #include <string>
-#include <string_view>
+#include <sstream>
+#include <mutex>
 
-namespace nombacrypt {
+namespace nombacrypt{
 
-/// Severity levels.
-enum class LogLevel : uint8_t {
-    DEBUG = 0,
-    INFO  = 1,
-    WARN  = 2,
-    ERROR = 3,
-    FATAL = 4,
+enum class LogLevel {
+    INFO,
+    WARN,
+    ERROR
 };
 
-/**
- * @class Logger
- * @brief Singleton thread-safe logger writing to stdout.
- *
- * Output format:
- *   [2026-07-03T18:00:00.123Z] [tid:12345] [INFO ] module: message
- */
 class Logger {
 public:
-    /// Obtain the global logger instance.
-    static Logger& instance();
+    static Logger& get_instance();
 
-    /// Set the minimum severity that will be emitted.
-    void set_level(LogLevel level) noexcept;
-
-    /// Core logging method — prefer the macros below.
-    void log(LogLevel level,
-             std::string_view module,
-             std::string_view message,
-             const char* file = __builtin_FILE(),
-             int line = __builtin_LINE());
-
-    /// Convenience typed wrappers.
-    void info (std::string_view module, std::string_view message);
-    void warn (std::string_view module, std::string_view message);
-    void error(std::string_view module, std::string_view message);
-    void debug(std::string_view module, std::string_view message);
-    void fatal(std::string_view module, std::string_view message);
+    void log(LogLevel level, const std::string& message);
 
 private:
     Logger() = default;
-    ~Logger() = default;
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
 
     std::mutex mutex_;
-    LogLevel   min_level_ = LogLevel::INFO;
-
-    /// Format the current wall-clock time as ISO-8601.
-    static std::string timestamp_now();
-
-    /// Return the current thread ID as a string.
-    static std::string thread_id_str();
 };
 
-} // namespace nombacrypt
+#define LOG_INFO(msg) do { \
+    std::ostringstream _nombacrypt_oss; \
+    _nombacrypt_oss << msg; \
+    nombacrypt::Logger::get_instance().log(nombacrypt::LogLevel::INFO, _nombacrypt_oss.str()); \
+} while(0)
 
-// ── Convenience Macros ───────────────────────────────────────────────────────
+#define LOG_WARN(msg) do { \
+    std::ostringstream _nombacrypt_oss; \
+    _nombacrypt_oss << msg; \
+    nombacrypt::Logger::get_instance().log(nombacrypt::LogLevel::WARN, _nombacrypt_oss.str()); \
+} while(0)
 
-/// @def LOG_INFO(module, msg)
-#define LOG_INFO(module, msg)  ::nombacrypt::Logger::instance().info(module, msg)
+#define LOG_ERROR(msg) do { \
+    std::ostringstream _nombacrypt_oss; \
+    _nombacrypt_oss << msg; \
+    nombacrypt::Logger::get_instance().log(nombacrypt::LogLevel::ERROR, _nombacrypt_oss.str()); \
+} while(0)
 
-/// @def LOG_WARN(module, msg)
-#define LOG_WARN(module, msg)  ::nombacrypt::Logger::instance().warn(module, msg)
-
-/// @def LOG_ERROR(module, msg)
-#define LOG_ERROR(module, msg) ::nombacrypt::Logger::instance().error(module, msg)
-
-/// @def LOG_DEBUG(module, msg)
-#define LOG_DEBUG(module, msg) ::nombacrypt::Logger::instance().debug(module, msg)
+}

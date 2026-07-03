@@ -1,49 +1,61 @@
-/**
- * @file config.cpp
- * @brief Implementation of nombacrypt::Config.
- */
-
 #include "core/config.hpp"
-
+#include "core/constants.hpp"
 #include <cstdlib>
+#include <iostream>
 
 namespace nombacrypt {
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-std::string Config::env_or(const char* name, const char* fallback) {
-    const char* val = std::getenv(name);
-    return val ? std::string(val) : std::string(fallback);
+Config::Config() {
+    // Initialization done in load_from_env()
 }
 
-// ── Loaders ──────────────────────────────────────────────────────────────────
-
-bool Config::load_from_env() {
-    nomba_client_id_   = env_or("NOMBA_CLIENT_ID", "");
-    nomba_private_key_ = env_or("NOMBA_PRIVATE_KEY", "");
-    engine_port_       = static_cast<uint16_t>(std::stoi(env_or("ENGINE_PORT", "9100")));
-    ws_port_           = static_cast<uint16_t>(std::stoi(env_or("WS_PORT", "9101")));
-    worker_count_      = static_cast<uint32_t>(std::stoul(env_or("WORKER_COUNT", "4")));
-    log_level_         = env_or("LOG_LEVEL", "INFO");
-    multi_api_enabled_ = env_or("MULTI_API_ENABLED", "0") == "1";
-
-    // TODO: validate mandatory fields and return false if missing
-    return !nomba_client_id_.empty() && !nomba_private_key_.empty();
+Config& Config::get_instance() {
+    static Config instance;
+    return instance;
 }
 
-bool Config::load_from_file(const std::string& /*filepath*/) {
-    // TODO: parse JSON config file and populate fields
-    return false;
+std::string Config::get_env(const char* key, const std::string& default_value) {
+    // Standard C++ getenv works perfectly on MinGW, Linux, and Mac
+    const char* val = std::getenv(key);
+    if (val) {
+        return std::string(val);
+    }
+    return default_value;
 }
 
-// ── Accessors ────────────────────────────────────────────────────────────────
+int Config::get_env_int(const char* key, int default_value) {
+    std::string val = get_env(key);
+    if (!val.empty()) {
+        try {
+            return std::stoi(val);
+        } catch (...) {
+            std::cerr << "Warning Invalid integer for env var " << key
+                      << ". Using default: " << default_value << std::endl;
+        }
+    }
+    return default_value;
+}
 
-const std::string& Config::nomba_client_id()  const noexcept { return nomba_client_id_;   }
-const std::string& Config::nomba_private_key() const noexcept { return nomba_private_key_; }
-uint16_t           Config::engine_port()       const noexcept { return engine_port_;       }
-uint16_t           Config::ws_port()           const noexcept { return ws_port_;           }
-uint32_t           Config::worker_count()      const noexcept { return worker_count_;      }
-const std::string& Config::log_level()         const noexcept { return log_level_;         }
-bool               Config::multi_api_enabled() const noexcept { return multi_api_enabled_; }
+void Config::load_from_env() {
+    // API Credentials
+    nomba_client_id    = get_env("NOMBA_TEST_CLIENT_ID");
+    nomba_private_key  = get_env("NOMBA_TEST_PRIVATE_KEY");
+    nomba_account_id   = get_env("NOMBA_TEST_ACCOUNT_ID");
+    nomba_api_base_url = get_env("NOMBA_API_BASE_URL", "https://sandbox.nomba.com/v1");
+
+    // Multi-API Channels (Optional)
+    channel_b_client_id   = get_env("NOMBA_CHANNEL_B_CLIENT_ID");
+    channel_b_private_key = get_env("NOMBA_CHANNEL_B_PRIVATE_KEY");
+    channel_c_client_id   = get_env("NOMBA_CHANNEL_C_CLIENT_ID");
+    channel_c_private_key = get_env("NOMBA_CHANNEL_C_PRIVATE_KEY");
+
+    // Engine Configuration
+    http_port        = get_env_int("ENGINE_HTTP_PORT", 8080);
+    ws_port          = get_env_int("ENGINE_WS_PORT", 8081);
+    buffer_capacity  = get_env_int("ENGINE_BUFFER_CAPACITY", BUFFER_CAPACITY);
+    ingest_threads   = get_env_int("ENGINE_INGEST_THREADS", DEFAULT_INGEST_THREADS);
+    crypto_threads   = get_env_int("ENGINE_CRYPTO_THREADS", DEFAULT_CRYPTO_THREADS);
+    dispatch_threads = get_env_int("ENGINE_DISPATCH_THREADS", DEFAULT_DISPATCH_THREADS);
+}
 
 } // namespace nombacrypt

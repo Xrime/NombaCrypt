@@ -1,74 +1,35 @@
-"""
-app — NombaCrypt Shell Control API package
-==========================================
-Exposes the ``create_app`` factory used by ``run.py`` and ``wsgi.py``.
-"""
-
 from flask import Flask
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from flask_socketio import SocketIO
+import os
+import sys
 
-from app.models import db
+# Add the control-api directory to the Python path so it can find 'config'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.settings import Config
 
-# ---------------------------------------------------------------------------
-# Extension instances (initialised in create_app)
-# ---------------------------------------------------------------------------
-jwt = JWTManager()
-cors = CORS()
-limiter = Limiter(key_func=get_remote_address, default_limits=["200 per minute"])
-socketio = SocketIO()
-
-
-def create_app(config_name: str | None = None) -> Flask:
-    """Application factory.
-
-    Parameters
-    ----------
-    config_name:
-        One of ``"development"`` (default), ``"production"``, or a dotted
-        path to a custom config object.
-
-    Returns
-    -------
-    Flask
-        Fully-configured Flask application instance.
-    """
-    import os
+def create_app(config_class=Config):
+    """Factory function to construct the Flask application."""
 
     app = Flask(__name__)
+    app.config.from_object(config_class)
 
-    # ---- Load configuration ------------------------------------------------
-    if config_name is None:
-        config_name = os.getenv("FLASK_ENV", "development")
+    # Allow the React frontend (which usually runs on port 3000) to talk to us
+    CORS(app)
 
-    config_map = {
-        "development": "config.development.DevelopmentConfig",
-        "production": "config.production.ProductionConfig",
-    }
-    app.config.from_object(config_map.get(config_name, config_name))
+    # --- Register Blueprints (Routes) ---
+    # We will build out the individual routes later.
+    # For now, we just add a simple health check.
 
-    # ---- Initialise extensions ---------------------------------------------
-    db.init_app(app)
-    jwt.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", "*")}})
-    limiter.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
-
-    # ---- Register blueprints -----------------------------------------------
+    @app.route('/api/health', methods=['GET'])
+    def health_check():
+        return {
+            "status": "healthy",
+            "message": "NombaCrypt Shell Control API is running",
+            "c_plus_plus_engine": Config.ENGINE_BASE_URL
+        }, 200
+        # --- Register Blueprints (Routes) ---
     from app.routes import register_blueprints
-
     register_blueprints(app)
 
-    # ---- Register error handlers -------------------------------------------
-    from app.middleware.error_handler import register_error_handlers
-
-    register_error_handlers(app)
-
-    # ---- Create DB tables (dev convenience) --------------------------------
-    with app.app_context():
-        db.create_all()
-
+    return app
     return app

@@ -1,117 +1,104 @@
-/**
- * @file ring_buffer.cpp
- * @brief Implementation of nombacrypt::RingBuffer.
- */
+#include "../../include/buffer/ring_buffer.hpp"
+#include <algorithm>
 
-#include "buffer/ring_buffer.hpp"
-
-#include <chrono>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <emmintrin.h>
+#endif
 
 namespace nombacrypt {
 
-// ── Constructor ──────────────────────────────────────────────────────────────
-
-RingBuffer::RingBuffer() {
-    for (std::size_t i = 0; i < BUFFER_CAPACITY; ++i) {
-        slots_[i].reset();
-        slots_[i].slot_id = i;
-    }
+RingBuffer::RingBuffer(size_t capacity) : capacity_(capacity) {
+    // Capacity must be a power of 2 for the bitwise AND modulo trick to work.
 }
 
-// ── Enqueue ──────────────────────────────────────────────────────────────────
+int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t priority) {
+    // 1. Atomically claim the next write position
+    uint64_t current_head = head_.fetch_add(1, std::memory_order_relaxed);
+    uint64_t current_tail = tail_.load(std::memory_order_acquire);
 
-std::optional<uint64_t> RingBuffer::enqueue(const char* data, uint32_t len, uint8_t priority) {
-    // Attempt to claim the next head slot.
-    uint64_t pos = head_.load(std::memory_order_relaxed);
-    for (;;) {
-        auto& slot = slots_[mask(pos)];
-        uint8_t expected = SLOT_EMPTY;
-        if (!slot.state.compare_exchange_weak(expected, SLOT_WRITTEN,
-                                               std::memory_order_acq_rel)) {
-            // Slot is not empty — buffer may be full.
-            if (pos - tail_.load(std::memory_order_acquire) >= BUFFER_CAPACITY) {
-                return std::nullopt; // truly full
-            }
-            pos = head_.load(std::memory_order_relaxed);
-            continue;
-        }
-        // We own the slot — write payload.
-        head_.compare_exchange_strong(pos, pos + 1, std::memory_order_release);
-        slot.slot_id = pos;
-        slot.write(data, len, priority);
-
-        // Record ingestion time.
-        auto now = std::chrono::steady_clock::now();
-        slot.ingested_at_us = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                now.time_since_epoch()).count());
-
-        slot.state.store(SLOT_WRITTEN, std::memory_order_release);
-        total_enqueued_.fetch_add(1, std::memory_order_relaxed);
-        return mask(pos);
+    // 2. Backpressure: Check if buffer is completely full
+    if (current_head - current_tail >= capacity_) {
+        head_.fetch_sub(1, std::memory_order_relaxed); // Revert claim
+        return -1; // HTTP layer should return 503 Service Unavailable
     }
-}
 
-// ── Dequeue for processing ───────────────────────────────────────────────────
+    // 3. Fast wrap-around modulo calculation
+    size_t index = current_head & (capacity_ - 1);
+    TransactionSlot& slot = slots_[index];
+
+    // 4. Spin-wait until the slot is truly EMPTY (in case tail cleanup is lagging)
+
+    SlotState expected = SlotState::EMPTY;
+    while (!slot.state.compare_exchange_weak(expected, SlotState::EMPTY, std::memory_order_relaxed)) {
+        expected = SlotState::EMPTY;
+        #ifdef _WIN32
+            YieldProcessor();
+        #else
+            _mm_pause();
+        #endif
+    }
+
+    // 5. Write the payload data straight into the pre-allocated memory slot
+    std::memcpy(slot.payload, json_payload, std::min(static_cast<size_t>(len), MAX_PAYLOAD_SIZE));
+    slot.payload_len = len;
+    slot.priority = priority;
+    slot.ingested_at_us = now_microseconds();
+    slot.slot_id = current_head;
+
+    // 6. Release the slot to the Crypto workers--> idris your work here
+    // slot.state.store(SlotState::WRITTEN, std::memory_order_release);
+    slot.state.store(SlotState::PROCESSING, std::memory_order_release);
+    total_enqueued_.fetch_add(1, std::memory_order_relaxed);
+
+    return index;
+}
 
 TransactionSlot* RingBuffer::dequeue_for_processing() {
-    uint64_t pos = tail_.load(std::memory_order_relaxed);
-    for (;;) {
-        if (pos >= head_.load(std::memory_order_acquire)) {
-            return nullptr; // nothing to read
-        }
-        auto& slot = slots_[mask(pos)];
-        uint8_t expected = SLOT_WRITTEN;
-        if (slot.state.compare_exchange_weak(expected, SLOT_PROCESSING,
-                                              std::memory_order_acq_rel)) {
-            tail_.compare_exchange_strong(pos, pos + 1, std::memory_order_release);
-            return &slot;
-        }
-        // Another consumer won this slot — try next.
-        pos = tail_.load(std::memory_order_relaxed);
+    uint64_t current_tail = tail_.load(std::memory_order_relaxed);
+    uint64_t current_head = head_.load(std::memory_order_acquire);
+
+    // Buffer is totally empty
+    if (current_tail == current_head) return nullptr;
+
+    size_t index = current_tail & (capacity_ - 1);
+    TransactionSlot& slot = slots_[index];
+
+    // Only dequeue if the Crypto thread has approved it (changed state to PROCESSING)
+    if (slot.state.load(std::memory_order_acquire) == SlotState::PROCESSING) {
+        return &slot;
     }
+
+    return nullptr;
 }
 
-// ── Mark dispatched ──────────────────────────────────────────────────────────
+void RingBuffer::mark_dispatched(int64_t slot_id) {
+    // Apply the fast bitwise modulo to wrap the huge ID back into the 0-8191 range!
+    size_t index = slot_id & (capacity_ - 1);
+    TransactionSlot& slot = slots_[index];
 
-void RingBuffer::mark_dispatched(uint64_t index) {
-    auto& slot = slots_[mask(index)];
-    slot.state.store(SLOT_DISPATCHED, std::memory_order_release);
+    // Wipe the slot clean
+    slot.state.store(SlotState::EMPTY, std::memory_order_release);
+
+    // Move the tail forward to officially free the space
+    tail_.fetch_add(1, std::memory_order_release);
     total_dispatched_.fetch_add(1, std::memory_order_relaxed);
 }
 
-// ── Recycle ──────────────────────────────────────────────────────────────────
+BufferTelemetry RingBuffer::get_telemetry() const {
+    uint64_t current_head = head_.load(std::memory_order_relaxed);
+    uint64_t current_tail = tail_.load(std::memory_order_relaxed);
 
-uint64_t RingBuffer::recycle_dispatched() {
-    uint64_t count = 0;
-    for (std::size_t i = 0; i < BUFFER_CAPACITY; ++i) {
-        uint8_t expected = SLOT_DISPATCHED;
-        if (slots_[i].state.compare_exchange_strong(expected, SLOT_EMPTY,
-                                                     std::memory_order_acq_rel)) {
-            slots_[i].reset();
-            slots_[i].slot_id = i;
-            ++count;
-        }
-    }
-    return count;
+    size_t active = current_head - current_tail;
+    float pct = (static_cast<float>(active) / capacity_) * 100.0f;
+
+    return {
+        active,
+        pct,
+        total_enqueued_.load(std::memory_order_relaxed),
+        total_dispatched_.load(std::memory_order_relaxed)
+    };
 }
-
-// ── Telemetry ────────────────────────────────────────────────────────────────
-
-uint64_t RingBuffer::active_count() const noexcept {
-    uint64_t count = 0;
-    for (std::size_t i = 0; i < BUFFER_CAPACITY; ++i) {
-        if (slots_[i].state.load(std::memory_order_relaxed) != SLOT_EMPTY)
-            ++count;
-    }
-    return count;
-}
-
-double RingBuffer::capacity_percent() const noexcept {
-    return (static_cast<double>(active_count()) / BUFFER_CAPACITY) * 100.0;
-}
-
-uint64_t RingBuffer::total_enqueued()   const noexcept { return total_enqueued_.load(std::memory_order_relaxed);   }
-uint64_t RingBuffer::total_dispatched() const noexcept { return total_dispatched_.load(std::memory_order_relaxed); }
 
 } // namespace nombacrypt
