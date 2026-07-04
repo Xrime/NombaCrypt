@@ -5,11 +5,28 @@ set(CMAKE_CXX_STANDARD 20)
 
 include_directories(include)
 
-# Add all our source files to the build
-add_executable(NombaCrypt_Shell
-        main.cpp
+set(CORE_SOURCES
         src/core/config.cpp
         src/core/logger.cpp
         src/buffer/ring_buffer.cpp
         src/rate_limiter/token_bucket.cpp
+        src/crypto/sequence_hasher.cpp
+        src/crypto/hmac_verifier.cpp
+        src/crypto/anti_replay_ledger.cpp
+        src/crypto/event_ledger.cpp
+)
+
+add_executable(NombaCrypt_Shell
+        main.cpp
+        ${CORE_SOURCES}
+)
+
+add_executable(test_hmac_verifier
+        tests/test_hmac_verifier.cpp
+        src/crypto/hmac_verifier.cpp
+)
+
+add_executable(test_anti_replay
+        tests/test_anti_replay.cpp
+        ${CORE_SOURCES}
 )
