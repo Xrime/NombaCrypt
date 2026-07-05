@@ -14,24 +14,21 @@ RingBuffer::RingBuffer(size_t capacity) : capacity_(capacity) {
 }
 
 int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t priority) {
-    // 1. Atomically claim the next write position
-    uint64_t current_head = head_.fetch_add(1, std::memory_order_relaxed);
-    uint64_t current_tail = tail_.load(std::memory_order_acquire);
-
-    // 2. Backpressure: Check if buffer is completely full
-    if (current_head - current_tail >= capacity_) {
-        head_.fetch_sub(1, std::memory_order_relaxed); // Revert claim
-        return -1; // HTTP layer should return 503 Service Unavailable
+    // 1. Backpressure: Check if buffer is completely full BEFORE modifying head_
+    if (head_.load(std::memory_order_relaxed) - tail_.load(std::memory_order_relaxed) >= capacity_) {
+        return -1; // HTTP layer should return 429 Too Many Requests
     }
+
+    // 2. Atomically claim the next write position
+    uint64_t current_head = head_.fetch_add(1, std::memory_order_relaxed);
 
     // 3. Fast wrap-around modulo calculation
     size_t index = current_head & (capacity_ - 1);
     TransactionSlot& slot = slots_[index];
 
-    // 4. Spin-wait until the slot is truly EMPTY (in case tail cleanup is lagging)
-
+    // 4. Spin-wait until the slot is truly EMPTY, and lock it by setting it to WRITTEN
     SlotState expected = SlotState::EMPTY;
-    while (!slot.state.compare_exchange_weak(expected, SlotState::EMPTY, std::memory_order_relaxed)) {
+    while (!slot.state.compare_exchange_weak(expected, SlotState::WRITTEN, std::memory_order_acquire)) {
         expected = SlotState::EMPTY;
         #ifdef _WIN32
             YieldProcessor();
@@ -40,15 +37,14 @@ int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t prio
         #endif
     }
 
-    // 5. Write the payload data straight into the pre-allocated memory slot
+    // 5. Write the payload data straight into the locked memory slot
     std::memcpy(slot.payload, json_payload, std::min(static_cast<size_t>(len), MAX_PAYLOAD_SIZE));
     slot.payload_len = len;
     slot.priority = priority;
     slot.ingested_at_us = now_microseconds();
     slot.slot_id = current_head;
 
-    // 6. Release the slot to the Crypto workers--> idris your work here
-    // slot.state.store(SlotState::WRITTEN, std::memory_order_release);
+    // 6. Release the slot to the Crypto workers
     slot.state.store(SlotState::PROCESSING, std::memory_order_release);
     total_enqueued_.fetch_add(1, std::memory_order_relaxed);
 

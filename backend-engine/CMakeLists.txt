@@ -14,6 +14,7 @@ set(CORE_SOURCES
         src/crypto/hmac_verifier.cpp
         src/crypto/anti_replay_ledger.cpp
         src/crypto/event_ledger.cpp
+        src/server/http_server.cpp
 )
 
 add_executable(NombaCrypt_Shell
@@ -30,3 +31,8 @@ add_executable(test_anti_replay
         tests/test_anti_replay.cpp
         ${CORE_SOURCES}
 )
+
+if (WIN32)
+    target_link_libraries(NombaCrypt_Shell ws2_32)
+    target_link_libraries(test_anti_replay ws2_32)
+endif()
