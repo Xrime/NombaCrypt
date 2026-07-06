@@ -56,7 +56,9 @@ std::string sha256(const std::string& message) noexcept {
         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
 
-    std::vector<uint8_t> padded(message.begin(), message.end());
+    std::vector<uint8_t> padded;
+    padded.reserve(message.size() + 64);
+    padded.insert(padded.end(), message.begin(), message.end());
     uint64_t bit_len = static_cast<uint64_t>(message.size()) * 8;
     
     padded.push_back(0x80);
@@ -128,38 +130,44 @@ std::string sha256(const std::string& message) noexcept {
 
 std::string HmacVerifier::compute_hmac(const std::string& payload, const std::string& secret_key) noexcept {
     constexpr size_t BLOCK_SIZE = 64;
-    std::string key = secret_key;
+    thread_local std::string cached_key = "";
+    thread_local std::string o_key_pad(BLOCK_SIZE, '\0');
+    thread_local std::string i_key_pad(BLOCK_SIZE, '\0');
 
-    if (key.size() > BLOCK_SIZE) {
-        key = sha256(key);
-    }
-    if (key.size() < BLOCK_SIZE) {
-        key.append(BLOCK_SIZE - key.size(), '\0');
-    }
-
-    std::string o_key_pad(BLOCK_SIZE, '\0');
-    std::string i_key_pad(BLOCK_SIZE, '\0');
-
-    for (size_t i = 0; i < BLOCK_SIZE; ++i) {
-        o_key_pad[i] = key[i] ^ 0x5c;
-        i_key_pad[i] = key[i] ^ 0x36;
+    if (cached_key != secret_key || cached_key.empty()) {
+        std::string key = secret_key;
+        if (key.size() > BLOCK_SIZE) key = sha256(key);
+        if (key.size() < BLOCK_SIZE) key.append(BLOCK_SIZE - key.size(), '\0');
+        for (size_t i = 0; i < BLOCK_SIZE; ++i) {
+            o_key_pad[i] = key[i] ^ 0x5c;
+            i_key_pad[i] = key[i] ^ 0x36;
+        }
+        cached_key = secret_key;
     }
 
-    std::string inner_msg = i_key_pad + payload;
+    std::string inner_msg;
+    inner_msg.reserve(BLOCK_SIZE + payload.size());
+    inner_msg.append(i_key_pad);
+    inner_msg.append(payload);
     std::string inner_hash = sha256(inner_msg);
 
-    std::string outer_msg = o_key_pad + inner_hash;
+    std::string outer_msg;
+    outer_msg.reserve(BLOCK_SIZE + 32);
+    outer_msg.append(o_key_pad);
+    outer_msg.append(inner_hash);
     return sha256(outer_msg);
 }
 
 std::string HmacVerifier::compute_hmac_hex(const std::string& payload, const std::string& secret_key) noexcept {
     std::string raw_hmac = compute_hmac(payload, secret_key);
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0');
+    std::string result;
+    result.reserve(raw_hmac.size() * 2);
+    static const char* hex_chars = "0123456789abcdef";
     for (unsigned char c : raw_hmac) {
-        ss << std::setw(2) << static_cast<int>(c);
+        result.push_back(hex_chars[c >> 4]);
+        result.push_back(hex_chars[c & 0x0F]);
     }
-    return ss.str();
+    return result;
 }
 
 bool HmacVerifier::verify_signature(const std::string& payload, const std::string& signature_hex, const std::string& secret_key) noexcept {
@@ -180,12 +188,14 @@ bool HmacVerifier::verify_signature(const std::string& payload, const std::strin
 
 std::string HmacVerifier::sha256_hex(const std::string& message) noexcept {
     std::string raw = sha256(message);
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0');
+    std::string result;
+    result.reserve(raw.size() * 2);
+    static const char* hex_chars = "0123456789abcdef";
     for (unsigned char c : raw) {
-        ss << std::setw(2) << static_cast<int>(c);
+        result.push_back(hex_chars[c >> 4]);
+        result.push_back(hex_chars[c & 0x0F]);
     }
-    return ss.str();
+    return result;
 }
 
 }

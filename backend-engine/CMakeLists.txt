@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(NombaCrypt_Shell)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -flto -pthread")
 
 include_directories(include)
 
@@ -34,5 +35,10 @@ add_executable(test_hmac_verifier
 
 add_executable(test_anti_replay
         tests/test_anti_replay.cpp
+        ${CORE_SOURCES}
+)
+
+add_executable(test_stress
+        tests/test_stress.cpp
         ${CORE_SOURCES}
 )

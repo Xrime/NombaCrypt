@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <shared_mutex>
 #include <cstdint>
+#include <thread>
+#include <stop_token>
 
 namespace nombacrypt {
 
@@ -34,11 +36,18 @@ public:
     size_t size() const noexcept;
 
 private:
-    AntiReplayLedger() = default;
-    ~AntiReplayLedger() = default;
+    AntiReplayLedger();
+    ~AntiReplayLedger();
+    void eviction_loop(std::stop_token st);
 
-    mutable std::shared_mutex mutex_;
-    std::unordered_map<uint64_t, Timestamp> seen_hashes_; // Hash -> timestamp enqueued in us
+    static constexpr size_t NUM_SHARDS = 64;
+    struct Shard {
+        mutable std::shared_mutex mutex;
+        std::unordered_map<uint64_t, Timestamp> hashes;
+    };
+    
+    Shard shards_[NUM_SHARDS];
+    std::jthread eviction_thread_;
 };
 
 } // namespace nombacrypt

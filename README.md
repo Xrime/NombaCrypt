@@ -26,6 +26,13 @@ Admins can deploy seven distinct Nomba-powered modules from the dashboard:
 6. **Dunning Engine:** A sophisticated retry system for failed installment payments.
 7. **Downstream Forwarder:** Instantly syncing verified payments to accounting software (like Zoho/QuickBooks) or Zapier.
 
+## 🛡️ Security Layer Architecture
+The **Security Shield** is a dedicated multithreaded interceptor within the C++ pipeline that sanitizes and verifies incoming payloads *before* they touch the backend business logic. 
+- **HMAC-SHA256 Verifier:** Validates payload authenticity using Nomba Webhook secret keys, utilizing thread-local caching for a massive throughput boost.
+- **Anti-Replay Ledger:** A high-speed, lock-free (sharded mutex) tracking ledger that immediately drops identical `transaction_ids` or exact payload copies to thwart replay attacks. 
+- **Background TTL Eviction:** Memory leaks are prevented via an automated `std::jthread` that sweeps the ledger for expired hashes without blocking the main event loop.
+- **Event Ledger Telemetry:** Emits real-time JSON `SECURITY_ALERT` events directly to the Next.js control plane via a WebSocket IPC Bridge whenever a threat is neutralized.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
