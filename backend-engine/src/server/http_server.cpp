@@ -50,8 +50,8 @@ namespace nombacrypt {
 
     void HttpServer::start() {
         LOG_INFO("HTTP Server starting on port " << port_ << "...");
-        // Bypass Windows Firewall by binding to localhost instead of 0.0.0.0
-        svr_->listen("localhost", port_);
+        // Bind to 0.0.0.0 so Docker can expose the port to the public internet
+        svr_->listen("0.0.0.0", port_);
     }
 
     void HttpServer::stop() {
