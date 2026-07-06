@@ -1,5 +1,6 @@
 #include "reconciler/reconciler.hpp"
 #include <iostream>
+#include <mutex>
 
 namespace nombacrypt {
 
