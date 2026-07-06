@@ -20,6 +20,7 @@ WORKDIR /app
 COPY CMakeLists.txt ./
 COPY include/ ./include/
 COPY src/ ./src/
+COPY tests/ ./tests/
 COPY main.cpp ./
 
 # Build the C++ Engine for Release
