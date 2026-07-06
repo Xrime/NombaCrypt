@@ -1,11 +1,3 @@
-/**
- * @file card_tokenizer.cpp
- * @brief Implementation of secure card tokenization using HMAC-SHA256.
- *
- * Uses the existing HmacVerifier module to compute HMAC digests.
- * Tokens are deterministic: same card + same key = same token,
- * enabling validation without storing the raw card number.
- */
 
 #include "billing/card_tokenizer.hpp"
 #include "crypto/hmac_verifier.hpp"
@@ -22,7 +14,6 @@ std::string CardTokenizer::tokenize_card(const std::string& card_number,
         return "";
     }
 
-    // Strip any spaces or dashes from the card number for normalization
     std::string normalized;
     normalized.reserve(card_number.size());
     for (char c : card_number) {
@@ -36,7 +27,7 @@ std::string CardTokenizer::tokenize_card(const std::string& card_number,
         return "";
     }
 
-    // Compute HMAC-SHA256 hex digest of the normalized card number
+
     std::string hmac_hex = HmacVerifier::compute_hmac_hex(normalized, secret_key);
 
     if (hmac_hex.empty()) {
@@ -44,7 +35,7 @@ std::string CardTokenizer::tokenize_card(const std::string& card_number,
         return "";
     }
 
-    // Prefix with "tok_" for easy identification in logs and storage
+
     std::string token = std::string(TOKEN_PREFIX) + hmac_hex;
 
     LOG_INFO("CardTokenizer: tokenized card ending in " << masked_last_four(card_number)
@@ -60,7 +51,7 @@ bool CardTokenizer::validate_token(const std::string& card_number,
         return false;
     }
 
-    // Re-tokenize and compare using constant-time comparison
+
     std::string expected_token = tokenize_card(card_number, secret_key);
 
     if (expected_token.empty()) {
@@ -71,7 +62,7 @@ bool CardTokenizer::validate_token(const std::string& card_number,
 }
 
 std::string CardTokenizer::masked_last_four(const std::string& card_number) {
-    // Extract only digits
+
     std::string digits;
     for (char c : card_number) {
         if (std::isdigit(static_cast<unsigned char>(c))) {
@@ -87,7 +78,7 @@ std::string CardTokenizer::masked_last_four(const std::string& card_number) {
 }
 
 bool CardTokenizer::luhn_check(const std::string& card_number) {
-    // Extract only digits
+
     std::string digits;
     for (char c : card_number) {
         if (std::isdigit(static_cast<unsigned char>(c))) {
@@ -102,7 +93,7 @@ bool CardTokenizer::luhn_check(const std::string& card_number) {
     int sum = 0;
     bool double_digit = false;
 
-    // Process from right to left
+
     for (int i = static_cast<int>(digits.size()) - 1; i >= 0; --i) {
         int digit = digits[static_cast<size_t>(i)] - '0';
 
@@ -133,4 +124,4 @@ bool CardTokenizer::constant_time_compare(const std::string& a, const std::strin
     return result == 0;
 }
 
-} // namespace nombacrypt
+}
