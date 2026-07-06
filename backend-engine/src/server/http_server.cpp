@@ -1,5 +1,6 @@
 #include "server/http_server.hpp"
 #include "core/logger.hpp"
+#include "core/config.hpp"
 
 // Tell the MinGW compiler we are running on modern Windows 10+
 #ifdef _WIN32
@@ -45,6 +46,54 @@ namespace nombacrypt {
             BufferTelemetry stats = buffer_->get_telemetry();
             std::string json = "{\"total_enqueued\":" + std::to_string(stats.total_enqueued) + "}";
             res.set_content(json, "application/json");
+        });
+
+        // -----------------------------------------------------------------------
+        // GET /api/config - Retrieve dynamic configuration
+        // -----------------------------------------------------------------------
+        svr_->Get("/api/config", [](const httplib::Request&, httplib::Response& res) {
+            const Config& config = Config::get_instance();
+            std::string json_res = "{"
+                "\"nomba_api_base_url\":\"" + config.get_nomba_api_base_url() + "\","
+                "\"nomba_client_id\":\"" + config.get_nomba_client_id() + "\","
+                "\"nomba_private_key\":\"" + config.get_nomba_private_key() + "\","
+                "\"nomba_account_id\":\"" + config.get_nomba_account_id() + "\""
+                "}";
+            res.set_content(json_res, "application/json");
+        });
+
+        // -----------------------------------------------------------------------
+        // POST /api/config - Update dynamic configuration
+        // -----------------------------------------------------------------------
+        svr_->Post("/api/config", [](const httplib::Request& req, httplib::Response& res) {
+            Config& config = Config::get_instance();
+            
+            // Very basic JSON parsing without pulling in heavy dependencies.
+            // In a production app, we would use RapidJSON or nlohmann/json.
+            // We will do a simple string search for this hackathon feature.
+            
+            auto extract_json_val = [](const std::string& body, const std::string& key) -> std::string {
+                std::string search = "\"" + key + "\":\"";
+                size_t pos = body.find(search);
+                if (pos == std::string::npos) return "";
+                pos += search.length();
+                size_t end_pos = body.find("\"", pos);
+                if (end_pos == std::string::npos) return "";
+                return body.substr(pos, end_pos - pos);
+            };
+
+            std::string url = extract_json_val(req.body, "nomba_api_base_url");
+            std::string client = extract_json_val(req.body, "nomba_client_id");
+            std::string key = extract_json_val(req.body, "nomba_private_key");
+            std::string account = extract_json_val(req.body, "nomba_account_id");
+
+            if (!url.empty()) config.set_nomba_api_base_url(url);
+            if (!client.empty()) config.set_nomba_client_id(client);
+            if (!key.empty()) config.set_nomba_private_key(key);
+            if (!account.empty()) config.set_nomba_account_id(account);
+
+            LOG_INFO("[HttpServer] Dynamic configuration updated via /api/config");
+            res.set_content("{\"status\":\"success\"}", "application/json");
         });
     }
 

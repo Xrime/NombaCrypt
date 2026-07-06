@@ -78,15 +78,14 @@ bool CryptoWorker::verify_slot(TransactionSlot* slot) {
     // Step 3: HMAC signature verification
     // In production, the signature would come from an HTTP header (X-Nomba-Signature).
     // For the hackathon pipeline, we compute the expected signature using the configured
-    // private key and verify that the payload has not been tampered with in transit.
-    //
-    // When running through the HTTP server, the server layer will extract the signature
-    // header and attach it to the slot. For now in the internal pipeline, we verify
-    // payload integrity by computing and caching the HMAC.
+    // private key, but in production, we would verify a client-provided signature.
+
+    // 1. Signature Verification (Simulated with our own key for the demo)
     const Config& config = Config::get_instance();
-    if (!config.nomba_private_key.empty()) {
+    std::string private_key = config.get_nomba_private_key();
+    if (!private_key.empty()) {
         // Compute HMAC signature of the payload for integrity verification
-        std::string computed_sig = HmacVerifier::compute_hmac_hex(payload, config.nomba_private_key);
+        std::string computed_sig = HmacVerifier::compute_hmac_hex(payload, private_key);
 
         // Log the successful verification
         EventLedger::get_instance().log_event(
