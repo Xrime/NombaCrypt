@@ -17,6 +17,9 @@ public:
     int64_t enqueue(const char* json_payload, uint32_t len, const char* signature_hex = "", uint8_t priority = 0);
     TransactionSlot* dequeue_for_processing();
 
+    /// Returns next slot in writen state for crypto verification (me, Security)
+    TransactionSlot* dequeue_for_crypto_verification();
+
     void mark_dispatched(int64_t slot_index);
 
     BufferTelemetry get_telemetry() const;
@@ -32,4 +35,4 @@ private:
     size_t capacity_;
 };
 
-} // namespace nombacrypt
+}

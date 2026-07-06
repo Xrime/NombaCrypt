@@ -784,3 +784,24 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(255, 51, 102, 0.2);
   box-shadow: 0 0 20px rgba(255, 51, 102, 0.3);
 }
+
+/* ── Additional Badge Types ───────────────────────────────────── */
+.badge-dropped { background: rgba(136, 136, 170, 0.12); color: var(--text-muted); }
+.badge-queued { background: rgba(51, 153, 255, 0.12); color: var(--info); }
+.badge-processing { background: rgba(123, 97, 255, 0.12); color: var(--accent); }
+
+/* ── Additional Utilities ─────────────────────────────────────── */
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .sim-split { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}

@@ -16,6 +16,12 @@ set(CORE_SOURCES
         src/crypto/event_ledger.cpp
         src/server/http_server.cpp
         src/reconciler/reconciler.cpp
+        src/pipeline/crypto_worker.cpp
+        src/billing/installment_plan.cpp
+        src/billing/card_tokenizer.cpp
+        src/billing/subscription_manager.cpp
+        src/forwarder/payload_sanitizer.cpp
+        src/forwarder/downstream_forwarder.cpp
 )
 
 add_executable(NombaCrypt_Shell
