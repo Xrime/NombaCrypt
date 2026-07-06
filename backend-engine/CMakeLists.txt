@@ -22,6 +22,10 @@ set(CORE_SOURCES
         src/billing/subscription_manager.cpp
         src/forwarder/payload_sanitizer.cpp
         src/forwarder/downstream_forwarder.cpp
+        src/dunning/backoff_strategy.cpp
+        src/dunning/dunning_engine.cpp
+        src/nuban/nuban_cache.cpp
+        src/nuban/nuban_provisioner.cpp
 )
 
 add_executable(NombaCrypt_Shell
