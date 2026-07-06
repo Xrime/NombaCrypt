@@ -27,7 +27,7 @@ void mock_dispatcher(std::shared_ptr<RingBuffer> buffer) {
                 LOG_INFO("Dropped transaction " << slot->slot_id << " due to INVALID SIGNATURE");
             } else {
                 // TEAMMATE: Check against replay attacks
-                uint64_t hash = SequenceHasher::hash_transaction(payload_str);
+                uint64_t hash = SequenceHasher::fnv1a_hash(payload_str);
                 if (!AntiReplayLedger::get_instance().insert_and_check(hash, slot->ingested_at_us)) {
                     LOG_INFO("Dropped transaction " << slot->slot_id << " due to REPLAY ATTACK (Duplicate Hash)");
                 } else {
