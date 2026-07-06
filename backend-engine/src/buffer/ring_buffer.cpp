@@ -47,9 +47,9 @@ int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t prio
     slot.ingested_at_us = now_microseconds();
     slot.slot_id = current_head;
 
-    // 6. Release the slot to the Crypto workers--> idris your work here
-    // slot.state.store(SlotState::WRITTEN, std::memory_order_release);
-    slot.state.store(SlotState::PROCESSING, std::memory_order_release);
+    // 6. Release the slot to the Crypto workers for security verification
+    //    Flow: WRITTEN → (CryptoWorker verifies) → PROCESSING → DISPATCHED
+    slot.state.store(SlotState::WRITTEN, std::memory_order_release);
     total_enqueued_.fetch_add(1, std::memory_order_relaxed);
 
     return index;
@@ -70,6 +70,26 @@ TransactionSlot* RingBuffer::dequeue_for_processing() {
         return &slot;
     }
 
+    return nullptr;
+}
+
+TransactionSlot* RingBuffer::dequeue_for_crypto_verification() {
+    uint64_t current_tail = tail_.load(std::memory_order_relaxed);
+    uint64_t current_head = head_.load(std::memory_order_acquire);
+
+    // Scan from tail towards head looking for a WRITTEN slot
+    for (uint64_t pos = current_tail; pos < current_head; ++pos) {
+        size_t index = pos & (capacity_ - 1);
+        TransactionSlot& slot = slots_[index];
+
+        // Try to atomically claim a WRITTEN slot
+        SlotState expected = SlotState::WRITTEN;
+        if (slot.state.compare_exchange_strong(
+                expected, SlotState::WRITTEN,
+                std::memory_order_acq_rel, std::memory_order_relaxed)) {
+            return &slot;
+        }
+    }
     return nullptr;
 }
 
