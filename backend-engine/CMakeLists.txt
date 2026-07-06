@@ -15,6 +15,7 @@ set(CORE_SOURCES
         src/crypto/anti_replay_ledger.cpp
         src/crypto/event_ledger.cpp
         src/server/http_server.cpp
+        src/reconciler/reconciler.cpp
 )
 
 add_executable(NombaCrypt_Shell
@@ -32,7 +33,13 @@ add_executable(test_anti_replay
         ${CORE_SOURCES}
 )
 
+add_executable(test_reconciler
+        tests/test_reconciler.cpp
+        ${CORE_SOURCES}
+)
+
 if (WIN32)
     target_link_libraries(NombaCrypt_Shell ws2_32)
     target_link_libraries(test_anti_replay ws2_32)
+    target_link_libraries(test_reconciler ws2_32)
 endif()

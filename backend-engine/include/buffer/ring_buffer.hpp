@@ -14,7 +14,7 @@ class RingBuffer {
 public:
     explicit RingBuffer(size_t capacity = BUFFER_CAPACITY);
 
-    int64_t enqueue(const char* json_payload, uint32_t len, uint8_t priority = 0);
+    int64_t enqueue(const char* json_payload, uint32_t len, const char* signature_hex = "", uint8_t priority = 0);
     TransactionSlot* dequeue_for_processing();
 
     void mark_dispatched(int64_t slot_index);

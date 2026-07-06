@@ -7,11 +7,35 @@
 
 using namespace nombacrypt;
 
+#include "crypto/hmac_verifier.hpp"
+#include "crypto/anti_replay_ledger.hpp"
+#include "crypto/sequence_hasher.hpp"
+
 // A temporary background thread to clear the buffer so it doesn't get stuck at 8,192
 void mock_dispatcher(std::shared_ptr<RingBuffer> buffer) {
     while (true) {
         TransactionSlot* slot = buffer->dequeue_for_processing();
         if (slot) {
+            // TEAMMATE: Verify the payload signature using the HMAC Verifier
+            std::string payload_str(slot->payload, slot->payload_len);
+            std::string signature_str(slot->signature);
+            
+            // Note: In production, load this from Config
+            std::string secret_key = "nomba_secret_key"; 
+            
+            if (!HmacVerifier::verify_signature(payload_str, signature_str, secret_key)) {
+                LOG_INFO("Dropped transaction " << slot->slot_id << " due to INVALID SIGNATURE");
+            } else {
+                // TEAMMATE: Check against replay attacks
+                uint64_t hash = SequenceHasher::hash_transaction(payload_str);
+                if (!AntiReplayLedger::get_instance().insert_and_check(hash, slot->ingested_at_us)) {
+                    LOG_INFO("Dropped transaction " << slot->slot_id << " due to REPLAY ATTACK (Duplicate Hash)");
+                } else {
+                    // Transaction is authentic and unique!
+                    // Proceed to send to Nomba Sandbox...
+                }
+            }
+
             buffer->mark_dispatched(slot->slot_id);
         } else {
             std::this_thread::yield();

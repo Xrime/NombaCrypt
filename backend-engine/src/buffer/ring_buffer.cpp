@@ -13,7 +13,7 @@ RingBuffer::RingBuffer(size_t capacity) : capacity_(capacity) {
     // Capacity must be a power of 2 for the bitwise AND modulo trick to work.
 }
 
-int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t priority) {
+int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, const char* signature_hex, uint8_t priority) {
     // 1. Backpressure: Check if buffer is completely full BEFORE modifying head_
     if (head_.load(std::memory_order_relaxed) - tail_.load(std::memory_order_relaxed) >= capacity_) {
         return -1; // HTTP layer should return 429 Too Many Requests
@@ -39,6 +39,12 @@ int64_t RingBuffer::enqueue(const char* json_payload, uint32_t len, uint8_t prio
 
     // 5. Write the payload data straight into the locked memory slot
     std::memcpy(slot.payload, json_payload, std::min(static_cast<size_t>(len), MAX_PAYLOAD_SIZE));
+    
+    // TEAMMATE: Storing the signature inside the slot so the dispatcher can verify it later
+    if (signature_hex) {
+        std::strncpy(slot.signature, signature_hex, sizeof(slot.signature) - 1);
+        slot.signature[sizeof(slot.signature) - 1] = '\0';
+    }
     slot.payload_len = len;
     slot.priority = priority;
     slot.ingested_at_us = now_microseconds();

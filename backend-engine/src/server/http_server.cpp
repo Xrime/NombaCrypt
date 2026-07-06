@@ -21,11 +21,13 @@ namespace nombacrypt {
     }
 
     void HttpServer::setup_routes() {
-        // When the Python Traffic Generator hits us with an account creation request...
         svr_->Post("/api/accounts", [this](const httplib::Request& req, httplib::Response& res) {
 
+            // TEAMMATE: Extract the X-Signature header from the request. Default to empty if missing.
+            std::string signature = req.has_header("X-Signature") ? req.get_header_value("X-Signature") : "";
+
             // Attempt to shove the request payload instantly into the Lock-Free Buffer
-            int64_t slot = buffer_->enqueue(req.body.c_str(), req.body.length());
+            int64_t slot = buffer_->enqueue(req.body.c_str(), req.body.length(), signature.c_str());
 
             if (slot != -1) {
                 // Buffer accepted it! Return 202 Accepted.
