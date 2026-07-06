@@ -15,32 +15,56 @@ export default function Simulator() {
   const [ncSuccess, setNcSuccess] = useState(0);
 
   useEffect(() => {
-    if (!running) return;
-    
-    let currentReqs = 0;
-    const interval = setInterval(() => {
-      currentReqs += 100;
-      if (currentReqs >= reqCount) {
-        clearInterval(interval);
-        setRunning(false);
-      }
-      
-      // Legacy behavior: high failure rate under load
-      setLegSuccess(prev => prev + Math.floor(Math.random() * 20));
-      setLegDrop(prev => prev + Math.floor(Math.random() * 40));
-      setLegTimeout(prev => prev + Math.floor(Math.random() * 40));
-      
-      // NombaCrypt behavior: perfect queueing
-      setNcSuccess(currentReqs);
+    // We no longer need the mock interval, the API handles the blast
+  }, []);
 
-    }, 50);
-    
-    return () => clearInterval(interval);
-  }, [running, reqCount]);
-
-  const startSim = () => {
+  const startSim = async () => {
     setLegDrop(0); setLegSuccess(0); setLegTimeout(0); setNcSuccess(0);
     setRunning(true);
+    
+    try {
+      // 1. Simulate the Legacy Unbuffered Pipeline (fake metrics for contrast)
+      // Legacy systems typically drop 30-40% of traffic under a 5000-request spike
+      const mockLegacySuccess = Math.floor(reqCount * 0.65);
+      const mockLegacyDrop = Math.floor(reqCount * 0.20);
+      const mockLegacyTimeout = reqCount - mockLegacySuccess - mockLegacyDrop;
+      
+      // Animate the legacy numbers counting up quickly
+      let legacyCount = 0;
+      const legInterval = setInterval(() => {
+        legacyCount += 250;
+        if (legacyCount >= reqCount) clearInterval(legInterval);
+        setLegSuccess(Math.min(legacyCount * 0.65, mockLegacySuccess));
+        setLegDrop(Math.min(legacyCount * 0.20, mockLegacyDrop));
+        setLegTimeout(Math.min(legacyCount * 0.15, mockLegacyTimeout));
+      }, 50);
+
+      // 2. Blast the REAL NombaCrypt Shell Pipeline using our API
+      const res = await fetch('/api/blast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestCount: reqCount })
+      });
+      
+      const data = await res.json();
+      
+      // Animate the NombaCrypt numbers counting up based on REAL success
+      let ncCount = 0;
+      const ncInterval = setInterval(() => {
+        ncCount += 500;
+        if (ncCount >= data.successCount) {
+          clearInterval(ncInterval);
+          setNcSuccess(data.successCount);
+        } else {
+          setNcSuccess(ncCount);
+        }
+      }, 50);
+
+    } catch (err) {
+      console.error("Simulation failed:", err);
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (

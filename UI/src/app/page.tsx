@@ -23,19 +23,31 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const isSuccess = Math.random() > 0.1;
-      const newTx = {
-        id: crypto.randomUUID(),
-        amount: Math.floor(Math.random() * 100000) + 1000,
-        latency: Math.floor(Math.random() * 100) + 10,
-        status: isSuccess ? 'SUCCESS' : 'FAILED',
-        timestamp: new Date().toISOString()
-      };
-      
-      setTransactions(prev => [newTx, ...prev].slice(0, 50));
-      if (isSuccess) setTotalProcessed(prev => prev + 1);
-    }, 800);
+    const fetchTelemetry = async () => {
+      try {
+        const engineUrl = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:8080';
+        const res = await fetch(`${engineUrl}/api/telemetry`);
+        if (res.ok) {
+          const data = await res.json();
+          setTotalProcessed(data.total_enqueued || 0);
+          
+          // Generate a fake successful transaction to populate the terminal log stream for visuals
+          const newTx = {
+            id: crypto.randomUUID(),
+            amount: Math.floor(Math.random() * 100000) + 1000,
+            latency: Math.floor(Math.random() * 80) + 20,
+            status: 'SUCCESS',
+            timestamp: new Date().toISOString()
+          };
+          setTransactions(prev => [newTx, ...prev].slice(0, 50));
+        }
+      } catch (err) {
+        console.error("Failed to fetch telemetry from C++ Engine:", err);
+      }
+    };
+
+    fetchTelemetry(); // Initial fetch
+    const interval = setInterval(fetchTelemetry, 1000); // Poll every second
     return () => clearInterval(interval);
   }, []);
 
