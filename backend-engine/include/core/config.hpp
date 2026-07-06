@@ -15,16 +15,22 @@ namespace nombacrypt {
         void load_from_env();
         
         // Thread-safe getters
+        bool get_multi_api_mode() const;
         std::string get_nomba_client_id() const;
         std::string get_nomba_private_key() const;
         std::string get_nomba_account_id() const;
         std::string get_nomba_api_base_url() const;
+        std::string get_channel_b_private_key() const;
+        std::string get_channel_c_private_key() const;
         
         // Thread-safe setters
+        void set_multi_api_mode(bool val);
         void set_nomba_client_id(const std::string& val);
         void set_nomba_private_key(const std::string& val);
         void set_nomba_account_id(const std::string& val);
         void set_nomba_api_base_url(const std::string& val);
+        void set_channel_b_private_key(const std::string& val);
+        void set_channel_c_private_key(const std::string& val);
 
         // Keep these public since they are only read at startup
         uint16_t http_port;
@@ -45,10 +51,13 @@ namespace nombacrypt {
         int get_env_int(const char* key, int default_value);
 
         mutable std::shared_mutex mutex_;
+        bool multi_api_mode_ = false;
         std::string nomba_client_id_;
         std::string nomba_private_key_;
         std::string nomba_account_id_;
         std::string nomba_api_base_url_;
+        std::string channel_b_private_key_;
+        std::string channel_c_private_key_;
     };
 
 } // namespace nombacrypt

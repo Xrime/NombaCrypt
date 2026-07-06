@@ -54,10 +54,13 @@ namespace nombacrypt {
         svr_->Get("/api/config", [](const httplib::Request&, httplib::Response& res) {
             const Config& config = Config::get_instance();
             std::string json_res = "{"
+                "\"multi_api_mode\":" + std::string(config.get_multi_api_mode() ? "true" : "false") + ","
                 "\"nomba_api_base_url\":\"" + config.get_nomba_api_base_url() + "\","
                 "\"nomba_client_id\":\"" + config.get_nomba_client_id() + "\","
                 "\"nomba_private_key\":\"" + config.get_nomba_private_key() + "\","
-                "\"nomba_account_id\":\"" + config.get_nomba_account_id() + "\""
+                "\"nomba_account_id\":\"" + config.get_nomba_account_id() + "\","
+                "\"channel_b_private_key\":\"" + config.get_channel_b_private_key() + "\","
+                "\"channel_c_private_key\":\"" + config.get_channel_c_private_key() + "\""
                 "}";
             res.set_content(json_res, "application/json");
         });
@@ -82,15 +85,29 @@ namespace nombacrypt {
                 return body.substr(pos, end_pos - pos);
             };
 
+            auto extract_json_bool = [](const std::string& body, const std::string& key) -> int {
+                std::string search_true = "\"" + key + "\":true";
+                std::string search_false = "\"" + key + "\":false";
+                if (body.find(search_true) != std::string::npos) return 1;
+                if (body.find(search_false) != std::string::npos) return 0;
+                return -1;
+            };
+
             std::string url = extract_json_val(req.body, "nomba_api_base_url");
             std::string client = extract_json_val(req.body, "nomba_client_id");
             std::string key = extract_json_val(req.body, "nomba_private_key");
             std::string account = extract_json_val(req.body, "nomba_account_id");
+            std::string channel_b = extract_json_val(req.body, "channel_b_private_key");
+            std::string channel_c = extract_json_val(req.body, "channel_c_private_key");
+            int multi_api = extract_json_bool(req.body, "multi_api_mode");
 
             if (!url.empty()) config.set_nomba_api_base_url(url);
             if (!client.empty()) config.set_nomba_client_id(client);
             if (!key.empty()) config.set_nomba_private_key(key);
             if (!account.empty()) config.set_nomba_account_id(account);
+            if (!channel_b.empty()) config.set_channel_b_private_key(channel_b);
+            if (!channel_c.empty()) config.set_channel_c_private_key(channel_c);
+            if (multi_api != -1) config.set_multi_api_mode(multi_api == 1);
 
             LOG_INFO("[HttpServer] Dynamic configuration updated via /api/config");
             res.set_content("{\"status\":\"success\"}", "application/json");

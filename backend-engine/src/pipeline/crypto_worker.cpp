@@ -83,6 +83,32 @@ bool CryptoWorker::verify_slot(TransactionSlot* slot) {
     // 1. Signature Verification (Simulated with our own key for the demo)
     const Config& config = Config::get_instance();
     std::string private_key = config.get_nomba_private_key();
+
+    // Multi-API Load Balancing logic (Round-Robin)
+    if (config.get_multi_api_mode()) {
+        static std::atomic<uint64_t> rr_counter{0};
+        uint64_t current = rr_counter.fetch_add(1, std::memory_order_relaxed);
+        
+        int channel = current % 3;
+        std::string channel_name = "Primary";
+        if (channel == 1) {
+            std::string key_b = config.get_channel_b_private_key();
+            if (!key_b.empty()) {
+                private_key = key_b;
+                channel_name = "Channel B";
+            }
+        } else if (channel == 2) {
+            std::string key_c = config.get_channel_c_private_key();
+            if (!key_c.empty()) {
+                private_key = key_c;
+                channel_name = "Channel C";
+            }
+        }
+        // Very verbose for debugging, maybe we shouldn't log on every request. 
+        // But for hackathon demonstration purposes, let's keep it.
+        LOG_INFO("[CryptoWorker] Load Balancer selected " << channel_name);
+    }
+
     if (!private_key.empty()) {
         // Compute HMAC signature of the payload for integrity verification
         std::string computed_sig = HmacVerifier::compute_hmac_hex(payload, private_key);

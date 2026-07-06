@@ -55,6 +55,11 @@ void Config::load_from_env() {
 // ---------------------------------------------------------------------------
 // Thread-Safe Getters
 // ---------------------------------------------------------------------------
+bool Config::get_multi_api_mode() const {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    return multi_api_mode_;
+}
+
 std::string Config::get_nomba_client_id() const {
     std::shared_lock<std::shared_mutex> lock(mutex_);
     return nomba_client_id_;
@@ -75,8 +80,34 @@ std::string Config::get_nomba_api_base_url() const {
     return nomba_api_base_url_;
 }
 
+std::string Config::get_channel_b_private_key() const {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    return channel_b_private_key_;
+}
+
+std::string Config::get_channel_c_private_key() const {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    return channel_c_private_key_;
+}
+
 // ---------------------------------------------------------------------------
 // Thread-Safe Setters
+// ---------------------------------------------------------------------------
+void Config::set_multi_api_mode(bool val) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    multi_api_mode_ = val;
+}
+
+void Config::set_channel_b_private_key(const std::string& val) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    channel_b_private_key_ = val;
+}
+
+void Config::set_channel_c_private_key(const std::string& val) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    channel_c_private_key_ = val;
+}
+
 // ---------------------------------------------------------------------------
 void Config::set_nomba_client_id(const std::string& val) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
