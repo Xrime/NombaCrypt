@@ -28,6 +28,11 @@ void EventLedger::configure(const std::string& filepath) noexcept {
     log_file_.open(log_filepath_, std::ios::out | std::ios::app);
 }
 
+void EventLedger::register_telemetry_callback(TelemetryCallback callback) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    telemetry_callbacks_.push_back(std::move(callback));
+}
+
 void EventLedger::log_event(const std::string& tx_id,
                             const std::string& event_type,
                             const std::string& status,
@@ -46,6 +51,24 @@ void EventLedger::log_event(const std::string& tx_id,
               << status << " | "
               << details << "\n";
     log_file_.flush();
+
+    // Broadcast to telemetry subscribers (WebSocket IPC Bridge)
+    if (!telemetry_callbacks_.empty()) {
+        // Build JSON format expected by Phase 3 Dashboard
+        // Escaping details safely for basic JSON
+        std::string json_event = "{"
+            "\"type\": \"SECURITY_ALERT\", "
+            "\"event\": \"" + event_type + "\", "
+            "\"tx_id\": \"" + tx_id + "\", "
+            "\"status\": \"" + status + "\", "
+            "\"details\": \"" + details + "\", "
+            "\"timestamp\": " + std::to_string(now) +
+            "}";
+        
+        for (const auto& callback : telemetry_callbacks_) {
+            callback(json_event);
+        }
+    }
 }
 
 }
