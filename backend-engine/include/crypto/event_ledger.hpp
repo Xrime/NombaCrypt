@@ -5,6 +5,7 @@
 #include <mutex>
 #include <fstream>
 #include <vector>
+#include <deque>
 #include <functional>
 
 namespace nombacrypt {
@@ -29,6 +30,8 @@ public:
                    const std::string& status,
                    const std::string& details) noexcept;
 
+    std::string get_recent_events_json() noexcept;
+
 private:
     EventLedger();
     ~EventLedger();
@@ -37,6 +40,7 @@ private:
     std::string log_filepath_;
     std::ofstream log_file_;
     std::vector<TelemetryCallback> telemetry_callbacks_;
+    std::deque<std::string> recent_events_;
 };
 
 } // namespace nombacrypt

@@ -42,6 +42,10 @@ UI/node_modules/
 UI/.next/
 UI/out/
 UI/.env.local
+simulator-app/node_modules/
+simulator-app/.next/
+simulator-app/out/
+simulator-app/.env.local
 
 # ── Simulator ──
 simulator/__pycache__/

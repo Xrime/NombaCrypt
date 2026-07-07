@@ -42,33 +42,48 @@ void EventLedger::log_event(const std::string& tx_id,
     std::lock_guard<std::mutex> lock(mutex_);
     if (!log_file_.is_open()) {
         std::cerr << "[" << now << "] | " << event_type << " | " << tx_id << " | " << status << " | " << details << std::endl;
-        return;
+    } else {
+        log_file_ << now << " | "
+                  << event_type << " | "
+                  << tx_id << " | "
+                  << status << " | "
+                  << details << "\n";
+        log_file_.flush();
     }
 
-    log_file_ << now << " | "
-              << event_type << " | "
-              << tx_id << " | "
-              << status << " | "
-              << details << "\n";
-    log_file_.flush();
+    std::string json_event = "{"
+        "\"type\": \"SECURITY_ALERT\", "
+        "\"event\": \"" + event_type + "\", "
+        "\"tx_id\": \"" + tx_id + "\", "
+        "\"status\": \"" + status + "\", "
+        "\"details\": \"" + details + "\", "
+        "\"timestamp\": " + std::to_string(now) +
+        "}";
+
+    recent_events_.push_front(json_event);
+    if (recent_events_.size() > 50) {
+        recent_events_.pop_back();
+    }
 
     // Broadcast to telemetry subscribers (WebSocket IPC Bridge)
     if (!telemetry_callbacks_.empty()) {
-        // Build JSON format expected by Phase 3 Dashboard
-        // Escaping details safely for basic JSON
-        std::string json_event = "{"
-            "\"type\": \"SECURITY_ALERT\", "
-            "\"event\": \"" + event_type + "\", "
-            "\"tx_id\": \"" + tx_id + "\", "
-            "\"status\": \"" + status + "\", "
-            "\"details\": \"" + details + "\", "
-            "\"timestamp\": " + std::to_string(now) +
-            "}";
-        
         for (const auto& callback : telemetry_callbacks_) {
             callback(json_event);
         }
     }
 }
 
+std::string EventLedger::get_recent_events_json() noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::string result = "[";
+    for (size_t i = 0; i < recent_events_.size(); ++i) {
+        result += recent_events_[i];
+        if (i < recent_events_.size() - 1) {
+            result += ",";
+        }
+    }
+    result += "]";
+    return result;
 }
+
+} // namespace nombacrypt

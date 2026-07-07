@@ -112,14 +112,30 @@ bool CryptoWorker::verify_slot(TransactionSlot* slot) {
     if (!private_key.empty()) {
         // Compute HMAC signature of the payload for integrity verification
         std::string computed_sig = HmacVerifier::compute_hmac_hex(payload, private_key);
+        std::string provided_sig = slot->signature;
 
-        // Log the successful verification
-        EventLedger::get_instance().log_event(
-            slot_id_str,
-            "SIGNATURE_VERIFIED",
-            "SUCCESS",
-            "HMAC: " + computed_sig.substr(0, 16) + "..."
-        );
+        if (provided_sig == computed_sig) {
+            // Log the successful verification
+            EventLedger::get_instance().log_event(
+                slot_id_str,
+                "SIGNATURE_VERIFIED",
+                "SUCCESS",
+                "HMAC: " + computed_sig.substr(0, 16) + "..."
+            );
+        } else {
+            // HMAC mismatch! Log it and mark slot as empty to drop it.
+            EventLedger::get_instance().log_event(
+                slot_id_str,
+                "HMAC_FAIL",
+                "BLOCKED",
+                "Provided: " + (provided_sig.empty() ? "NONE" : provided_sig.substr(0, 8) + "...") + " | Expected: " + computed_sig.substr(0, 8) + "..."
+            );
+            stat_rejected_sig_.fetch_add(1, std::memory_order_relaxed);
+            
+            // DROP the transaction by resetting slot to EMPTY
+            // The caller will also set it to EMPTY, but returning false is the key.
+            return false;
+        }
     }
 
     // Step 4: Log successful verification

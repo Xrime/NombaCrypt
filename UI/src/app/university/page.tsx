@@ -176,7 +176,7 @@ export default function UniversitySimulator() {
             animation: 'slide-in 0.5s ease-out',
           }}>
             <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ff3366', marginBottom: '8px' }}>
-              ⚠️ SERVER OVERLOAD — Portal Unresponsive
+              SERVER OVERLOAD — Portal Unresponsive
             </div>
             <div style={{ color: '#ff8899', fontSize: '0.85rem' }}>
               Connection pool exhausted. Students experiencing &quot;Error 504: Gateway Timeout&quot; and &quot;Error 503: Service Unavailable&quot;.
@@ -211,14 +211,14 @@ export default function UniversitySimulator() {
                 background: 'rgba(255,51,102,0.1)', color: '#ff3366', fontSize: '1rem', fontWeight: 700,
                 cursor: 'pointer', transition: '200ms ease',
               }}>
-                ❌ Run WITHOUT NombaCrypt
+                Run WITHOUT NombaCrypt
               </button>
               <button onClick={() => startSimulation('nombacrypt')} style={{
                 padding: '16px 32px', borderRadius: '12px', border: '2px solid rgba(0,255,136,0.4)',
                 background: 'rgba(0,255,136,0.1)', color: '#00ff88', fontSize: '1rem', fontWeight: 700,
                 cursor: 'pointer', transition: '200ms ease', boxShadow: '0 0 20px rgba(0,255,136,0.15)',
               }}>
-                ✅ Run WITH NombaCrypt Shell
+                Run WITH NombaCrypt Shell
               </button>
             </div>
           </div>

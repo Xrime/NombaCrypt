@@ -1,6 +1,7 @@
 #include "server/http_server.hpp"
 #include "core/logger.hpp"
 #include "core/config.hpp"
+#include "crypto/event_ledger.hpp"
 
 // Tell the MinGW compiler we are running on modern Windows 10+
 #ifdef _WIN32
@@ -22,8 +23,21 @@ namespace nombacrypt {
     }
 
     void HttpServer::setup_routes() {
-        svr_->Post("/api/accounts", [this](const httplib::Request& req, httplib::Response& res) {
+        auto cors_options_handler = [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type, X-Signature");
+            res.status = 200;
+        };
 
+        svr_->Options("/api/telemetry", cors_options_handler);
+        svr_->Options("/api/events", cors_options_handler);
+        svr_->Options("/api/config", cors_options_handler);
+        svr_->Options("/api/accounts", cors_options_handler);
+
+        svr_->Post("/api/accounts", [this](const httplib::Request& req, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            
             // TEAMMATE: Extract the X-Signature header from the request. Default to empty if missing.
             std::string signature = req.has_header("X-Signature") ? req.get_header_value("X-Signature") : "";
 
@@ -43,15 +57,26 @@ namespace nombacrypt {
 
         // Telemetry endpoint for the React Dashboard
         svr_->Get("/api/telemetry", [this](const httplib::Request& req, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
             BufferTelemetry stats = buffer_->get_telemetry();
             std::string json = "{\"total_enqueued\":" + std::to_string(stats.total_enqueued) + "}";
             res.set_content(json, "application/json");
         });
 
         // -----------------------------------------------------------------------
+        // GET /api/events - Retrieve the 50 most recent events for live dashboard
+        // -----------------------------------------------------------------------
+        svr_->Get("/api/events", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            std::string json_events = EventLedger::get_instance().get_recent_events_json();
+            res.set_content(json_events, "application/json");
+        });
+
+        // -----------------------------------------------------------------------
         // GET /api/config - Retrieve dynamic configuration
         // -----------------------------------------------------------------------
         svr_->Get("/api/config", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
             const Config& config = Config::get_instance();
             std::string json_res = "{"
                 "\"multi_api_mode\":" + std::string(config.get_multi_api_mode() ? "true" : "false") + ","
@@ -69,6 +94,7 @@ namespace nombacrypt {
         // POST /api/config - Update dynamic configuration
         // -----------------------------------------------------------------------
         svr_->Post("/api/config", [](const httplib::Request& req, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
             Config& config = Config::get_instance();
             
             // Very basic JSON parsing without pulling in heavy dependencies.

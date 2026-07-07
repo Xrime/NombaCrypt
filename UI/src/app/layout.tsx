@@ -11,15 +11,14 @@ export const metadata = {
 };
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/', icon: '⚡' },
-  { label: 'Transactions', href: '/transactions', icon: '📊' },
-  { label: 'Channels', href: '/channels', icon: '🔗' },
-  { label: 'Accounts', href: '/accounts', icon: '🏦' },
-  { label: 'Billing', href: '/billing', icon: '💳' },
-  { label: 'Reconciler', href: '/reconciler', icon: '🔍' },
-  { label: 'Security', href: '/security', icon: '🛡️' },
-  { label: 'Forwarder', href: '/forwarder', icon: '📡' },
-  { label: 'Simulator', href: '/simulator', icon: '🧪' },
+  { label: 'Dashboard', href: '/' },
+  { label: 'Transactions', href: '/transactions' },
+  { label: 'Channels', href: '/channels' },
+  { label: 'Accounts', href: '/accounts' },
+  { label: 'Billing', href: '/billing' },
+  { label: 'Reconciler', href: '/reconciler' },
+  { label: 'Security', href: '/security' },
+  { label: 'Forwarder', href: '/forwarder' },
 ];
 
 export default function RootLayout({
@@ -43,7 +42,6 @@ export default function RootLayout({
               {NAV_ITEMS.map((item) => (
                 <li key={item.label}>
                   <Link href={item.href} className="nav-link">
-                    <span className="nav-icon">{item.icon}</span>
                     {item.label}
                   </Link>
                 </li>
